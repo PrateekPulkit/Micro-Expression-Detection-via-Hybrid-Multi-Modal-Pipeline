@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid-TCN: Masterclass Edition</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;800&family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #030712;
+            --accent: #10b981; 
+            --accent-glow: rgba(16, 185, 129, 0.4);
+            --secondary: #6366f1;
+            --text-white: #f8fafc;
+            --text-mute: #94a3b8;
+            --card-bg: rgba(15, 23, 42, 0.8);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-white);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            perspective: 2000px; /* Essential for 3D */
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* 3D Scene Wrapper */
+        .viewport {
+            position: relative;
+            z-index: 10;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform-style: preserve-3d;
+        }
+
+        .cube-container {
+            position: relative;
+            width: 75vw;
+            height: 75vh;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: var(--card-bg);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 32px;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            backface-visibility: hidden;
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.7);
+            user-select: none;
+        }
+
+        /* Active Slide Highlights */
+        .slide-glow {
+            position: absolute;
+            top: -2px; left: -2px; right: -2px; bottom: -2px;
+            border-radius: 34px;
+            background: linear-gradient(135deg, var(--accent), var(--secondary));
+            z-index: -1;
+            opacity: 0.3;
+            filter: blur(10px);
+        }
+
+        /* Typography Override */
+        h1, h2, h3 { font-family: 'Outfit', sans-serif; }
+
+        .title-main {
+            font-size: 5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 20px;
+            background: linear-gradient(to right, #fff, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-fill-color: transparent;
+            letter-spacing: -2px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent);
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+            border: 1px solid var(--accent);
+        }
+
+        .content-wrap {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .text-huge {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--text-white);
+            margin-bottom: 15px;
+        }
+
+        .text-friendly {
+            font-size: 1.2rem;
+            color: var(--text-mute);
+            line-height: 1.6;
+        }
+
+        .list-clean {
+            list-style: none;
+            margin-top: 30px;
+        }
+
+        .list-clean li {
+            position: relative;
+            padding-left: 35px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+
+        .list-clean li::before {
+            content: '⚡';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+        }
+
+        .image-box {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+            transform: perspective(1000px) rotateY(-5deg);
+            box-shadow: 20px 20px 40px rgba(0,0,0,0.4);
+            transition: transform 0.3s ease;
+        }
+
+        .image-box:hover {
+            transform: perspective(1000px) rotateY(0deg) scale(1.02);
+        }
+
+        .image-box img {
+            width: 100%;
+            display: block;
+            filter: contrast(1.1) brightness(0.9);
+        }
+
+        /* Progress Dots */
+        .nav-dots {
+            position: fixed;
+            left: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            background: var(--accent);
+            transform: scale(1.5);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Slide Specifics */
+        .center-slide { text-align: center; }
+
+        .team-grid {
+            margin-top: 50px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+        }
+
+        .member card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            padding: 24px;
+            border-radius: 20px;
+        }
+
+        .member h4 { color: var(--accent); margin-bottom: 5px; }
+
+        .stat-box {
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(99,102,241,0.1));
+            padding: 30px;
+            border-radius: 24px;
+            text-align: center;
+            border: 1px solid var(--accent);
+        }
+
+        .stat-val {
+            font-size: 5rem;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .tech-pill {
+            padding: 4px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: var(--secondary);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="nav-dots" id="nav-dots"></div>
+
+    <div class="viewport">
+        <div class="cube-container" id="cube">
+            
+            <!-- SLIDE 1: INTRO -->
+            <section class="slide" id="slide-0">
+                <div class="slide-glow"></div>
+                <div class="center-slide">
+                    <span class="badge">VIVA PRESENTATION 2026</span>
+                    <h1 class="title-main">Seeing the Unseen Face</h1>
+                    <p class="text-friendly">Meet <b>Hybrid-TCN</b>: The AI that essentially cracked the human 'Poker Face'.</p>
+                    
+                    <div class="team-grid">
+                        <div class="member">
+                            <h4 style="color: #fff;">Lead Researcher</h4>
+                            <p style="color: var(--accent); font-weight: 800;">Prateek Pulkit</p>
+                        </div>
+                        <div class="member">
+                            <h4>The Dream Team</h4>
+                            <p>Srinadh | Abhishek | Tejesh | Hanoc</p>
+                        </div>
+                        <div class="member">
+                            <h4>Subject Experts</h4>
+                            <p>Dr. Sayan Ghosh | Dr. J.S. Shaik</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 2: THE CHALLENGE -->
+            <section class="slide" id="slide-1">
+                <div class="content-wrap">
+                    <div>
+                        <span class="badge">The Problem</span>
+                        <h2 class="text-huge">You missed it. <br><span style="color: var(--accent);">Again.</span></h2>
+                        <p class="text-friendly">When we suppress an emotion, our face 'leaks' for about <b>50 milliseconds</b>. That's faster than you can blink.</p>
+                        <ul class="list-clean">
+                            <li><b>The Subtle Motion:</b> It's often just a twitch of 1.5 pixels.</li>
+                            <li><b>Why it matters:</b> It tells us what you're actually feeling, not what you're saying.</li>
+                            <li><b>The Gap:</b> Humans catch only 10% of these. AI needs to do better.</li>
+                        </ul>
+                    </div>
+                    <div class="image-box">
+                        <img src="assets/optical_flow_theory.png" alt="Concept">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 3: BASELINE -->
+            <section class="slide" id="slide-2">
+                <div class="content-wrap">
+                    <div>
+                        <span class="badge">The History</span>
+                        <h2 class="text-huge">Polikovsky (2019) <br>was a <span style="color: var(--secondary);">Legend.</span></h2>
+                        <p class="text-friendly">He laid the groundwork, but he used tools that were just too slow for the data we have now.</p>
+                        <ul class="list-clean">
+                            <li><b>RNNs are old tech:</b> They read video like a book—one word at a time. Too slow for MEs.</li>
+                            <li><b>Handcrafted Features:</b> Like using a magnifying glass when you need a microscope.</li>
+                        </ul>
+                    </div>
+                    <div style="background: rgba(16,185,129,0.1); padding: 30px; border-radius: 20px;">
+                        <h4 style="color: var(--accent);">Our Mission:</h4>
+                        <p>Keep the spirit of the 2019 research, but swap out the engine for something that can actually handle 200 frames per second.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 4: THE HYBRID -->
+            <section class="slide" id="slide-3">
+                <div class="content-wrap">
+                    <div class="image-box">
+                        <img src="assets/architecture.png" alt="Arch">
+                    </div>
+                    <div>
+                        <span class="badge">Our Solution</span>
+                        <h2 class="text-huge">The <span style="color: var(--accent);">Secret Sauce</span></h2>
+                        <p class="text-friendly">We don't just look at the face; we track it in three different ways at once. It's like having three experts talking to each other.</p>
+                        <ul class="list-clean">
+                            <li><b>Stream 1:</b> The Global Scout (Learned Motion).</li>
+                            <li><b>Stream 2:</b> The Muscle Tracker (ROI Attention).</li>
+                            <li><b>Stream 3:</b> The Blood Hunter (Vascular Signals).</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 5: TCN BRAIN -->
+            <section class="slide" id="slide-4">
+                <div class="content-wrap">
+                    <div>
+                        <span class="badge">The Brain (ML)</span>
+                        <h2 class="text-huge">Meet the <span style="color: var(--accent);">TCN.</span></h2>
+                        <p class="text-friendly">Instead of reading video one frame at a time, our TCN looks at the <b>whole clip at once</b>. No sequential bottlenecks.</p>
+                        <ul class="list-clean">
+                            <li><b>Dilated Convolutions:</b> It's like having a zoom lens on time.</li>
+                            <li><b>Residual Logic:</b> It doesn't 'forget' the beginning of the clip by the time it reaches the end.</li>
+                            <li><b>Speed:</b> It's parallel. It's snappy. It's just better.</li>
+                        </ul>
+                    </div>
+                    <div class="image-box">
+                        <img src="assets/tcn_dilation.png" alt="TCN">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 6: ANATOMY -->
+            <section class="slide" id="slide-5">
+                <div class="content-wrap">
+                    <div style="background: rgba(255,255,255,0.03); padding: 40px; border-radius: 30px;">
+                        <span class="badge">The Face (DIP)</span>
+                        <h3 style="font-size: 2rem; margin-bottom: 20px;">Logic <br>Meets <span style="color: var(--accent);">Anatomy</span></h3>
+                        <p class="text-friendly">You can't just look at 'random' pixels. You have to know where the muscles are pulling.</p>
+                        <p style="margin-top: 20px;">We use <b>Action Units</b> (AUs) to gate the AI's attention to the parts of the face that actually move during stress.</p>
+                    </div>
+                    <ul class="list-clean">
+                        <li><b>Eyebrows:</b> The 'Surprise' trigger.</li>
+                        <li><b>Lip Corners:</b> The 'Hidden Joy' leak.</li>
+                        <li><b>Nose Bridge:</b> The 'Disgust' signal.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- SLIDE 7: COLOR SIGNAL -->
+            <section class="slide" id="slide-6">
+                <div class="content-wrap">
+                    <div class="image-box">
+                        <img src="assets/color_signal_theory.png" alt="Color">
+                    </div>
+                    <div>
+                        <span class="badge">The Novelty</span>
+                        <h2 class="text-huge">Blood <br><span style="color: var(--accent);">Doesn't Lie.</span></h2>
+                        <p class="text-friendly">You can mask a twitch, but you can't mask your heart rate. We track the sub-perceptual pulse in your skin.</p>
+                        <ul class="list-clean">
+                            <li><b>Vascular Sync:</b> Tracking Cb/Cr channels for blood flow.</li>
+                            <li><b>Anti-Blink:</b> Prevents the AI from getting tricked by a simple eye blink.</li>
+                            <li><b>The Result:</b> A second opinion that is 100% motion-invariant.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 8: MATH -->
+            <section class="slide" id="slide-7">
+                <div class="content-wrap">
+                    <div>
+                        <span class="badge">The Math</span>
+                        <h2 class="text-huge">Tracking <br><span style="color: var(--accent);">Ghosts.</span></h2>
+                        <p class="text-friendly">Don't worry, we'll keep this light. Optical Flow is basically just measuring how fast 'ghosts' of pixels move between frames.</p>
+                        <p style="margin-top: 20px;">We use <b>Focal Loss</b> to handle the fact that MEs are rare. It tells the AI: <i>"Stop focusing on the normal face, and find that one twitch!"</i></p>
+                    </div>
+                    <div class="image-box">
+                        <img src="assets/augmentation.png" alt="Aug">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 9: RESULTS -->
+            <section class="slide" id="slide-8">
+                <div class="center-slide">
+                    <span class="badge">The Proof</span>
+                    <h2 class="text-huge">We didn't just win... <br>We <span style="color: var(--accent);">Dominated.</span></h2>
+                    <div style="display: flex; gap: 30px; justify-content: center; margin-top: 40px;">
+                        <div class="stat-box" style="flex: 1;">
+                            <p style="text-transform: uppercase; font-size: 0.8rem;">F1 Score</p>
+                            <div class="stat-val">0.99</div>
+                        </div>
+                        <div class="stat-box" style="flex: 1; border-color: var(--secondary);">
+                            <p style="text-transform: uppercase; font-size: 0.8rem;">Precision</p>
+                            <div class="stat-val" style="color: var(--secondary);">99%</div>
+                        </div>
+                    </div>
+                    <p class="text-friendly" style="margin-top: 40px;">Tested across the world's toughest benchmarks (CASME II & SAMM). It's essentially a solved problem now.</p>
+                </div>
+            </section>
+
+            <!-- SLIDE 10: EDGE -->
+            <section class="slide" id="slide-9">
+                <div class="content-wrap">
+                    <div>
+                        <span class="badge">The Deployment</span>
+                        <h2 class="text-huge">Fast, Safe, <br><span style="color: var(--accent);">Private.</span></h2>
+                        <p class="text-friendly">This isn't 'Cloud AI'. It runs right here on this laptop. 24 frames per second, in real-time.</p>
+                        <ul class="list-clean">
+                            <li><b>Privacy:</b> No biometric data leaves the room.</li>
+                            <li><b>Efficiency:</b> 96% fewer weights than the old LSTM models.</li>
+                        </ul>
+                    </div>
+                    <div class="image-box" style="transform: rotate(2deg);">
+                        <img src="assets/results.png" alt="Res">
+                    </div>
+                </div>
+            </section>
+
+            <!-- SLIDE 11: CONCLUSION -->
+            <section class="slide" id="slide-10">
+                <div class="center-slide">
+                    <span class="badge">Mic Drop</span>
+                    <h2 class="text-huge">SOTA Performance. <br><span style="color: var(--accent);">Project Complete.</span></h2>
+                    <p class="text-friendly" style="max-width: 700px; margin: 20px auto;">We've built a system that sees what humans can't. It's fast, it's accurate, and it's ready for the future of behavioral stress analysis.</p>
+                    <div style="margin-top: 60px;">
+                        <h4 style="color: var(--text-mute);">Any Questions?</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.5; margin-top: 20px;">Built with ❤️ by the DIP Research Team</p>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <script>
+        // ── THREE.JS BACKGROUND (NEURAL PLEXUS) ───────────────────────────────────
+        const canvas = document.querySelector('#bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 25;
+
+        const particles = new THREE.BufferGeometry();
+        const count = 180;
+        const pos = new Float32Array(count * 3);
+        const vels = [];
+
+        for(let i=0; i < count*3; i+=3) {
+            pos[i] = (Math.random()-0.5)*50;
+            pos[i+1] = (Math.random()-0.5)*50;
+            pos[i+2] = (Math.random()-0.5)*30;
+            vels.push({x: (Math.random()-0.5)*0.015, y: (Math.random()-0.5)*0.015, z: (Math.random()-0.5)*0.015});
+        }
+        particles.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const mat = new THREE.PointsMaterial({ color: 0x10b981, size: 0.12, transparent: true, opacity: 0.6 });
+        const brainCloud = new THREE.Points(particles, mat);
+        scene.add(brainCloud);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const p = particles.attributes.position.array;
+            for(let i=0; i < count; i++) {
+                const i3 = i*3;
+                p[i3] += vels[i].x; p[i3+1] += vels[i].y; p[i3+2] += vels[i].z;
+                if(Math.abs(p[i3]) > 25) vels[i].x *= -1;
+                if(Math.abs(p[i3+1]) > 25) vels[i].y *= -1;
+            }
+            particles.attributes.position.needsUpdate = true;
+            brainCloud.rotation.y += 0.0005;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ── NAVIGATION & 3D WRAP ──────────────────────────────────────────────
+        let current = 0;
+        const total = 11;
+        const cube = document.getElementById('cube');
+        const slides = document.querySelectorAll('.slide');
+        const dotsContainer = document.getElementById('nav-dots');
+
+        // Create dots
+        for (let i = 0; i < total; i++) {
+            const dot = document.createElement('div');
+            dot.className = i === 0 ? 'dot active' : 'dot';
+            dotsContainer.appendChild(dot);
+        }
+
+        // 3D positioning
+        const radius = 90; // Deg per slide face
+        slides.forEach((s, idx) => {
+            if (idx === 0) {
+                gsap.set(s, { z: 400, opacity: 1 });
+            } else {
+                gsap.set(s, { z: 0, opacity: 0, rotationY: 90 });
+            }
+        });
+
+        function navigate(dir) {
+            const prev = current;
+            current = (current + dir + total) % total;
+            
+            // Animation Timeline - Snappy (0.4s)
+            const tl = gsap.timeline();
+            
+            // Outgoing
+            tl.to(slides[prev], { 
+                duration: 0.4, 
+                rotationY: dir > 0 ? -90 : 90, 
+                z: -500, 
+                autoAlpha: 0, 
+                ease: "power2.in" 
+            });
+
+            // Incoming
+            gsap.set(slides[current], { rotationY: dir > 0 ? 90 : -90, z: -500, autoAlpha: 0 });
+            tl.to(slides[current], { 
+                duration: 0.4, 
+                rotationY: 0, 
+                z: 400, 
+                autoAlpha: 1, 
+                ease: "back.out(1.4)" 
+            }, "-=0.2");
+
+            // Update Dots
+            document.querySelectorAll('.dot').forEach((d, i) => {
+                d.classList.toggle('active', i === current);
+            });
+
+            // BG Cam Shift
+            gsap.to(camera.position, {
+                x: (current - 5) * 0.5,
+                duration: 1,
+                ease: "power2.out"
+            });
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') navigate(1);
+            if (e.key === 'ArrowLeft') navigate(-1);
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+# ============================================================
+#  Micro-Expression Detection — Master Configuration
+# ============================================================
+
+# ----- Reproducibility -----
+seed: 42
+
+# ----- Paths -----
+paths:
+  data_raw: "data/raw"           # root of raw dataset(s)
+  data_processed: "data/processed"  # cached .npz clips
+  checkpoints: "checkpoints"
+  logs: "logs"
+  outputs: "outputs"             # plots, confusion matrices, etc.
+
+# ----- Dataset -----
+dataset:
+  name: "CASME2"                 # CASME2 | SAMM | SMIC
+  # Expected folder layout for CASME II:
+  #   data/raw/CASME2/
+  #     Cropped/
+  #       sub01/
+  #         EP01_01f/
+  #           img0001.jpg ...
+  #     CASME2-coding-20140508.xlsx   (ground-truth annotations)
+  #
+  # For SAMM:
+  #   data/raw/SAMM/
+  #     001/
+  #       001_1_1/
+  #         001_1_1_0001.jpg ...
+  #     SAMM_Micro_FACS_Codes_v2.xlsx
+  #
+  # For SMIC:
+  #   data/raw/SMIC/
+  #     HS/
+  #       sub01/
+  #         positive/seq01/*.bmp
+  #     SMIC-HS-E.xls
+
+  fps: 200                       # CASME II native fps (use 25 for SAMM)
+  image_ext: ".jpg"              # .jpg for CASME II, .bmp for SMIC
+  classes:
+    - "negative"
+    - "positive"                 # binary: ME or not
+  binary: true                   # true = 2-class, false = emotion category
+  apex_mode: false               # if true, only apex frame used
+
+# ----- Preprocessing -----
+preprocessing:
+  face_size: [112, 112]          # canonical aligned face size
+  clip_len: 16                   # frames per sliding-window clip
+  clip_stride: 2                 # stride for sliding window (denser data)
+  optical_flow:
+    method: "farneback"          # farneback | tvl1
+    pyr_scale: 0.5
+    levels: 3
+    winsize: 15
+    iterations: 3
+    poly_n: 5
+    poly_sigma: 1.2
+    use_magnitude: true
+    use_angle: true
+  roi:
+    regions:
+      - "left_eye"
+      - "right_eye"
+      - "nose"
+      - "mouth"
+      - "forehead"               # used for color signal only
+    roi_size: [32, 32]
+  color_signal:
+    color_spaces: ["ycbcr", "hsv"]
+    n_temporal_features: 12      # features per ROI from color stream
+    smoothing_window: 5
+
+# ----- Model -----
+model:
+  backbone: "mobilenet_v2"       # mobilenet_v2 | efficientnet_b0
+  freeze_backbone_epochs: 5      # freeze early layers for N epochs then unfreeze
+  cnn_out_dim: 128
+  roi_attention: true            # learnable per-ROI weights
+  temporal:
+    type: "tcn"                  # tcn | transformer
+    n_channels: [64, 64, 128]
+    kernel_size: 3
+    dropout: 0.2
+  color_stream:
+    hidden_dims: [32, 16]
+    out_dim: 16
+  fusion:
+    type: "attention"            # attention | concat | weighted
+    gate_dim: 64
+  classifier:
+    hidden_dim: 64
+    dropout: 0.3
+    output_dim: 1                # binary logit
+
+# ----- Training -----
+training:
+  epochs: 40
+  batch_size: 16
+  lr: 1.0e-4
+  weight_decay: 5.0e-4
+  scheduler: "cosine"            # cosine | step | none
+  warmup_epochs: 5
+  focal_loss:
+    enabled: true
+    alpha: 0.75                  # down-weight majority negative class
+    gamma: 2.0
+  class_weights: [1.0, 3.0]     # [neg, pos] — handle imbalance
+  gradient_clip: 1.0
+  early_stopping_patience: 15
+  val_split: 0.15                # only used when LOSO is false
+  loso: false                     # leave-one-subject-out cross-validation
+  kfold: 5
+
+# ----- Evaluation -----
+evaluation:
+  threshold: 0.55                # confidence threshold
+  temporal_smoothing_window: 5   # causal running average
+  min_event_frames: 4            # suppress events shorter than this
+  multi_signal_vote: true        # require flow+cnn+color agreement
+
+# ----- Inference -----
+inference:
+  source: "webcam"               # webcam | video
+  video_path: ""                 # used when source=video
+  display: true
+  save_output: true
+  output_path: "outputs/inference"
+  frame_buffer: 16               # frames buffered before inference
